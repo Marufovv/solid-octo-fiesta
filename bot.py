@@ -6,7 +6,7 @@ os.environ["CARD_NUMBER"] = "9860 0803 8838 5637"
 os.environ["CARD_HOLDER"] = "Jamshidbek Tojimatov"
 os.environ["SUPPORT_USERNAME"] = "@jamshiidbek"
 
-pip install aiogram python-dotenv
+
 
 
 import asyncio
