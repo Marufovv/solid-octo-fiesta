@@ -42,7 +42,7 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
 CARD_NUMBER = os.getenv("CARD_NUMBER", "KARTA_KIRITILMAGAN")
 CARD_HOLDER = os.getenv("CARD_HOLDER", "KARTA_EGASI")
-SUPPORT_USERNAME = os.getenv("SUPPORT_USERNAME", "@support")
+SUPPORT_USERNAME = os.getenv("SUPPORT_USERNAME", "@jamshiidek")
 
 if not BOT_TOKEN:
     raise ValueError("BOT_TOKEN topilmadi. .env faylga yozing.")
@@ -855,24 +855,6 @@ async def admin_actions(callback: CallbackQuery):
             f"🆔 Buyurtma ID: <code>#{order_id}</code>\n"
             f"📦 Mahsulot: <b>{product_name}</b>"
         )
-        await callback.message.edit_caption(
-            caption=(
-                f"✅ <b>Buyurtma #{order_id} tasdiqlandi</b>\n\n"
-                f"👤 Mijoz: {customer_name}\n"
-                f"📦 Mahsulot: {product_name}\n"
-                f"🎯 Qabul qiluvchi: {recipient_username}\n"
-                f"📌 Status: {format_status('confirmed')}"
-            ) if callback.message.photo or callback.message.document else None,
-            reply_markup=admin_order_buttons(order_id)
-        ) if (callback.message.photo or callback.message.document) else await callback.message.edit_text(
-            f"✅ <b>Buyurtma #{order_id} tasdiqlandi</b>\n\n"
-            f"👤 Mijoz: {customer_name}\n"
-            f"📦 Mahsulot: {product_name}\n"
-            f"🎯 Qabul qiluvchi: {recipient_username}\n"
-            f"📌 Status: {format_status('confirmed')}",
-            reply_markup=admin_order_buttons(order_id)
-        )
-        await callback.answer("Tasdiqlandi")
 
     elif action == "reject":
         update_order_status(order_id, "rejected")
@@ -882,24 +864,6 @@ async def admin_actions(callback: CallbackQuery):
             f"🆔 Buyurtma ID: <code>#{order_id}</code>\n"
             f"Savol bo‘lsa admin bilan bog‘laning."
         )
-        await callback.message.edit_caption(
-            caption=(
-                f"❌ <b>Buyurtma #{order_id} bekor qilindi</b>\n\n"
-                f"👤 Mijoz: {customer_name}\n"
-                f"📦 Mahsulot: {product_name}\n"
-                f"🎯 Qabul qiluvchi: {recipient_username}\n"
-                f"📌 Status: {format_status('rejected')}"
-            ) if callback.message.photo or callback.message.document else None,
-            reply_markup=admin_order_buttons(order_id)
-        ) if (callback.message.photo or callback.message.document) else await callback.message.edit_text(
-            f"❌ <b>Buyurtma #{order_id} bekor qilindi</b>\n\n"
-            f"👤 Mijoz: {customer_name}\n"
-            f"📦 Mahsulot: {product_name}\n"
-            f"🎯 Qabul qiluvchi: {recipient_username}\n"
-            f"📌 Status: {format_status('rejected')}",
-            reply_markup=admin_order_buttons(order_id)
-        )
-        await callback.answer("Bekor qilindi")
 
     elif action == "delivered":
         update_order_status(order_id, "delivered")
@@ -910,24 +874,8 @@ async def admin_actions(callback: CallbackQuery):
             f"📦 Mahsulot: <b>{product_name}</b>\n"
             f"🎯 Qabul qiluvchi: {recipient_username}"
         )
-        await callback.message.edit_caption(
-            caption=(
-                f"🎁 <b>Buyurtma #{order_id} yetkazildi</b>\n\n"
-                f"👤 Mijoz: {customer_name}\n"
-                f"📦 Mahsulot: {product_name}\n"
-                f"🎯 Qabul qiluvchi: {recipient_username}\n"
-                f"📌 Status: {format_status('delivered')}"
-            ) if callback.message.photo or callback.message.document else None,
-            reply_markup=admin_order_buttons(order_id)
-        ) if (callback.message.photo or callback.message.document) else await callback.message.edit_text(
-            f"🎁 <b>Buyurtma #{order_id} yetkazildi</b>\n\n"
-            f"👤 Mijoz: {customer_name}\n"
-            f"📦 Mahsulot: {product_name}\n"
-            f"🎯 Qabul qiluvchi: {recipient_username}\n"
-            f"📌 Status: {format_status('delivered')}",
-            reply_markup=admin_order_buttons(order_id)
-        )
-        await callback.answer("Yetkazildi")
+
+    await callback.answer("Bajarildi")
 
 
 # =========================
@@ -939,24 +887,16 @@ async def admin_panel(message: Message):
         await message.answer("Siz admin emassiz.")
         return
 
-    cursor.execute("""
-        SELECT COUNT(*) FROM orders WHERE status='pending'
-    """)
+    cursor.execute("SELECT COUNT(*) FROM orders WHERE status='pending'")
     pending = cursor.fetchone()[0]
 
-    cursor.execute("""
-        SELECT COUNT(*) FROM orders WHERE status='confirmed'
-    """)
+    cursor.execute("SELECT COUNT(*) FROM orders WHERE status='confirmed'")
     confirmed = cursor.fetchone()[0]
 
-    cursor.execute("""
-        SELECT COUNT(*) FROM orders WHERE status='delivered'
-    """)
+    cursor.execute("SELECT COUNT(*) FROM orders WHERE status='delivered'")
     delivered = cursor.fetchone()[0]
 
-    cursor.execute("""
-        SELECT COUNT(*) FROM users
-    """)
+    cursor.execute("SELECT COUNT(*) FROM users")
     total_users = cursor.fetchone()[0]
 
     text = (
@@ -988,15 +928,5 @@ async def main():
     await dp.start_polling(bot)
 
 
-import nest_asyncio
-nest_asyncio.apply()
-
-await main()
-
-@dp.callback_query(F.data == "gift_basic_menu")
-async def gift_basic_menu_handler(callback: CallbackQuery):
-    await callback.message.edit_text(
-        "⭐ <b>Gift Basic Stars</b>\n\nKerakli stars paketini tanlang:",
-        reply_markup=gift_basic_stars_menu()
-    )
-    await callback.answer()
+if __name__ == "__main__":
+    asyncio.run(main())
