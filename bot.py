@@ -44,54 +44,7 @@ WEBHOOK_URL = f"{BASE_URL}{WEBHOOK_PATH}"
 # Render port
 PORT = int(os.getenv("PORT", 10000))
 
-# =========================
-# BOT / DISPATCHER
-# =========================
-bot = Bot(
-    token=BOT_TOKEN,
-    default=DefaultBotProperties(parse_mode=ParseMode.HTML)
-)
 
-dp = Dispatcher()
-
-# =========================
-# KEYBOARD
-# =========================
-main_kb = InlineKeyboardMarkup(
-    inline_keyboard=[
-        [InlineKeyboardButton(text="⭐ Stars", callback_data="stars")],
-        [InlineKeyboardButton(text="👑 Premium", callback_data="premium")]
-    ]
-)
-
-# =========================
-# HANDLERS
-# =========================
-@dp.message(CommandStart())
-async def start_handler(message: Message):
-    text = (
-        f"Salom, {message.from_user.first_name}!\n\n"
-        "Bot webhook orqali ishlayapti ✅\n"
-        "Quyidagi bo‘limlardan birini tanlang:"
-    )
-    await message.answer(text, reply_markup=main_kb)
-
-
-@dp.callback_query(F.data == "stars")
-async def stars_handler(callback: CallbackQuery):
-    await callback.message.answer(
-        "⭐ Stars bo‘limi tanlandi.\n\n"
-        "Bu yerga keyin stars menyularingni qo‘shamiz."
-    )
-    await callback.answer()
-
-
-@dp.callback_query(F.data == "premium")
-async def premium_handler(callback: CallbackQuery):
-    await callback.message.answer(
-        "👑 Premium bo‘limi tanlandi.\n\n"
-        "Bu yerga keyin premium tariflaringni qo‘shamiz."
-    )
     await callback.answer()
 
 
