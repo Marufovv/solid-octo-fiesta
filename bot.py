@@ -7,7 +7,134 @@ os.environ["CARD_HOLDER"] = "Jamshidbek Tojimatov"
 os.environ["SUPPORT_USERNAME"] = "@jamshiidbek"
 
 
+import os
+import asyncio
+import logging
 
+from aiohttp import web
+from aiogram import Bot, Dispatcher, F
+from aiogram.client.default import DefaultBotProperties
+from aiogram.enums import ParseMode
+from aiogram.filters import CommandStart
+from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, Update
+from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
+
+# =========================
+# LOGGING
+# =========================
+logging.basicConfig(level=logging.INFO)
+
+# =========================
+# ENVIRONMENT VARIABLES
+# =========================
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+RENDER_EXTERNAL_URL = os.getenv("RENDER_EXTERNAL_URL")
+
+if not BOT_TOKEN:
+    raise ValueError("BOT_TOKEN topilmadi")
+
+if not RENDER_EXTERNAL_URL:
+    raise ValueError("RENDER_EXTERNAL_URL topilmadi")
+
+# Render domain oxirida / bo'lsa olib tashlaymiz
+BASE_URL = RENDER_EXTERNAL_URL.rstrip("/")
+WEBHOOK_PATH = "/webhook"
+WEBHOOK_URL = f"{BASE_URL}{WEBHOOK_PATH}"
+
+# Render port
+PORT = int(os.getenv("PORT", 10000))
+
+# =========================
+# BOT / DISPATCHER
+# =========================
+bot = Bot(
+    token=BOT_TOKEN,
+    default=DefaultBotProperties(parse_mode=ParseMode.HTML)
+)
+
+dp = Dispatcher()
+
+# =========================
+# KEYBOARD
+# =========================
+main_kb = InlineKeyboardMarkup(
+    inline_keyboard=[
+        [InlineKeyboardButton(text="⭐ Stars", callback_data="stars")],
+        [InlineKeyboardButton(text="👑 Premium", callback_data="premium")]
+    ]
+)
+
+# =========================
+# HANDLERS
+# =========================
+@dp.message(CommandStart())
+async def start_handler(message: Message):
+    text = (
+        f"Salom, {message.from_user.first_name}!\n\n"
+        "Bot webhook orqali ishlayapti ✅\n"
+        "Quyidagi bo‘limlardan birini tanlang:"
+    )
+    await message.answer(text, reply_markup=main_kb)
+
+
+@dp.callback_query(F.data == "stars")
+async def stars_handler(callback: CallbackQuery):
+    await callback.message.answer(
+        "⭐ Stars bo‘limi tanlandi.\n\n"
+        "Bu yerga keyin stars menyularingni qo‘shamiz."
+    )
+    await callback.answer()
+
+
+@dp.callback_query(F.data == "premium")
+async def premium_handler(callback: CallbackQuery):
+    await callback.message.answer(
+        "👑 Premium bo‘limi tanlandi.\n\n"
+        "Bu yerga keyin premium tariflaringni qo‘shamiz."
+    )
+    await callback.answer()
+
+
+# =========================
+# STARTUP / SHUTDOWN
+# =========================
+async def on_startup(bot: Bot):
+    await bot.set_webhook(WEBHOOK_URL)
+    logging.info(f"Webhook o'rnatildi: {WEBHOOK_URL}")
+
+
+async def on_shutdown(bot: Bot):
+    await bot.delete_webhook()
+    await bot.session.close()
+    logging.info("Webhook o'chirildi")
+
+
+async def healthcheck(request: web.Request):
+    return web.Response(text="Bot is running")
+
+
+def main():
+    dp.startup.register(on_startup)
+    dp.shutdown.register(on_shutdown)
+
+    app = web.Application()
+
+    app.router.add_get("/", healthcheck)
+    app.router.add_get("/health", healthcheck)
+
+    webhook_requests_handler = SimpleRequestHandler(
+        dispatcher=dp,
+        bot=bot,
+    )
+    webhook_requests_handler.register(app, path=WEBHOOK_PATH)
+
+    setup_application(app, dp, bot=bot)
+
+    web.run_app(app, host="0.0.0.0", port=PORT)
+
+
+if __name__ == "__main__":
+    main()
 
 import asyncio
 import logging
