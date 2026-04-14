@@ -1,103 +1,13 @@
 import os
-
-os.environ["BOT_TOKEN"] = "8554736433:AAFz8wxgr0W0sH_qlCJtmeZXb7C0xNfKMRk"
-os.environ["ADMIN_ID"] = "916940521"
-os.environ["CARD_NUMBER"] = "9860 0803 8838 5637"
-os.environ["CARD_HOLDER"] = "Jamshidbek Tojimatov"
-os.environ["SUPPORT_USERNAME"] = "@jamshiidbek"
-
-
-import os
 import asyncio
 import logging
-
-from aiohttp import web
-from aiogram import Bot, Dispatcher, F
-from aiogram.client.default import DefaultBotProperties
-from aiogram.enums import ParseMode
-from aiogram.filters import CommandStart
-from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, Update
-from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
-
-# =========================
-# LOGGING
-# =========================
-logging.basicConfig(level=logging.INFO)
-
-# =========================
-# ENVIRONMENT VARIABLES
-# =========================
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-RENDER_EXTERNAL_URL = os.getenv("RENDER_EXTERNAL_URL")
-
-if not BOT_TOKEN:
-    raise ValueError("BOT_TOKEN topilmadi")
-
-if not RENDER_EXTERNAL_URL:
-    raise ValueError("RENDER_EXTERNAL_URL topilmadi")
-
-# Render domain oxirida / bo'lsa olib tashlaymiz
-BASE_URL = RENDER_EXTERNAL_URL.rstrip("/")
-WEBHOOK_PATH = "/webhook"
-WEBHOOK_URL = f"{BASE_URL}{WEBHOOK_PATH}"
-
-# Render port
-PORT = int(os.getenv("PORT", 10000))
-
-
-    await callback.answer()
-
-
-# =========================
-# STARTUP / SHUTDOWN
-# =========================
-async def on_startup(bot: Bot):
-    await bot.set_webhook(WEBHOOK_URL)
-    logging.info(f"Webhook o'rnatildi: {WEBHOOK_URL}")
-
-
-async def on_shutdown(bot: Bot):
-    await bot.delete_webhook()
-    await bot.session.close()
-    logging.info("Webhook o'chirildi")
-
-
-async def healthcheck(request: web.Request):
-    return web.Response(text="Bot is running")
-
-
-def main():
-    dp.startup.register(on_startup)
-    dp.shutdown.register(on_shutdown)
-
-    app = web.Application()
-
-    app.router.add_get("/", healthcheck)
-    app.router.add_get("/health", healthcheck)
-
-    webhook_requests_handler = SimpleRequestHandler(
-        dispatcher=dp,
-        bot=bot,
-    )
-    webhook_requests_handler.register(app, path=WEBHOOK_PATH)
-
-    setup_application(app, dp, bot=bot)
-
-    web.run_app(app, host="0.0.0.0", port=PORT)
-
-
-if __name__ == "__main__":
-    main()
-
-import asyncio
-import logging
-import os
 import sqlite3
 from datetime import datetime
 
+from dotenv import load_dotenv
 from aiogram import Bot, Dispatcher, F
 from aiogram.client.default import DefaultBotProperties
-from aiogram.enums import ParseMode, ContentType
+from aiogram.enums import ParseMode
 from aiogram.filters import CommandStart, Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
@@ -110,8 +20,6 @@ from aiogram.types import (
     ReplyKeyboardMarkup,
     KeyboardButton,
 )
-from dotenv import load_dotenv
-
 
 # =========================
 # ENV
@@ -122,19 +30,19 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
 CARD_NUMBER = os.getenv("CARD_NUMBER", "KARTA_KIRITILMAGAN")
 CARD_HOLDER = os.getenv("CARD_HOLDER", "KARTA_EGASI")
-SUPPORT_USERNAME = os.getenv("SUPPORT_USERNAME", "@jamshiidek")
+SUPPORT_USERNAME = os.getenv("SUPPORT_USERNAME", "@support")
 
 if not BOT_TOKEN:
-    raise ValueError("BOT_TOKEN topilmadi. .env faylga yozing.")
+    raise ValueError("BOT_TOKEN topilmadi")
 
 if ADMIN_ID == 0:
-    raise ValueError("ADMIN_ID topilmadi. .env faylga yozing.")
-
+    raise ValueError("ADMIN_ID topilmadi")
 
 # =========================
 # LOGGING
 # =========================
 logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # =========================
 # BOT / DP
@@ -144,7 +52,6 @@ bot = Bot(
     default=DefaultBotProperties(parse_mode=ParseMode.HTML)
 )
 dp = Dispatcher(storage=MemoryStorage())
-
 
 # =========================
 # DATABASE
@@ -181,23 +88,9 @@ def init_db():
         )
     """)
     conn.commit()
-    ensure_columns()
-
-
-def ensure_columns():
-    cursor.execute("PRAGMA table_info(orders)")
-    columns = [row[1] for row in cursor.fetchall()]
-
-    if "receipt_file_id" not in columns:
-        cursor.execute("ALTER TABLE orders ADD COLUMN receipt_file_id TEXT")
-    if "receipt_file_type" not in columns:
-        cursor.execute("ALTER TABLE orders ADD COLUMN receipt_file_type TEXT")
-
-    conn.commit()
 
 
 init_db()
-
 
 # =========================
 # FSM
@@ -206,6 +99,29 @@ class OrderState(StatesGroup):
     entering_recipient = State()
     entering_receipt = State()
 
+# =========================
+# PRODUCTS
+# =========================
+PRODUCTS = {
+    "buy_premium_3m_no_login": ("Premium", "Premium 3 oy (Akkountga kirmasdan) — 175 000 so‘m"),
+    "buy_premium_6m_no_login": ("Premium", "Premium 6 oy (Akkountga kirmasdan) — 220 000 so‘m"),
+    "buy_premium_12m_no_login": ("Premium", "Premium 12 oy (Akkountga kirmasdan) — 375 000 so‘m"),
+
+    "buy_premium_1m_login": ("Premium", "Premium 1 oy (Akkountga kirib) — 45 000 so‘m"),
+    "buy_premium_12m_login": ("Premium", "Premium 12 oy (Akkountga kirib) — 280 000 so‘m"),
+
+    "buy_stars_15": ("Stars", "15 Stars — 3 500 so‘m"),
+    "buy_stars_25": ("Stars", "25 Stars — 6 000 so‘m"),
+    "buy_stars_50": ("Stars", "50 Stars — 12 000 so‘m"),
+    "buy_stars_75": ("Stars", "75 Stars — 16 000 so‘m"),
+    "buy_stars_100": ("Stars", "100 Stars — 23 000 so‘m"),
+    "buy_stars_150": ("Stars", "150 Stars — 34 000 so‘m"),
+    "buy_stars_250": ("Stars", "250 Stars — 55 000 so‘m"),
+    "buy_stars_500": ("Stars", "500 Stars — 105 000 so‘m"),
+    "buy_stars_1000": ("Stars", "1000 Stars — 205 000 so‘m"),
+
+    "buy_gift_premium": ("Gift", "Gift Premium"),
+}
 
 # =========================
 # KEYBOARDS
@@ -234,6 +150,7 @@ def main_menu_inline():
         ]
     )
 
+
 def premium_menu():
     return InlineKeyboardMarkup(
         inline_keyboard=[
@@ -242,6 +159,7 @@ def premium_menu():
             [InlineKeyboardButton(text="⬅️ Orqaga", callback_data="back_main")],
         ]
     )
+
 
 def premium_no_login_menu():
     return InlineKeyboardMarkup(
@@ -263,6 +181,7 @@ def premium_with_login_menu():
         ]
     )
 
+
 def stars_menu():
     return InlineKeyboardMarkup(
         inline_keyboard=[
@@ -277,6 +196,7 @@ def stars_menu():
         ]
     )
 
+
 def gift_menu():
     return InlineKeyboardMarkup(
         inline_keyboard=[
@@ -285,6 +205,7 @@ def gift_menu():
             [InlineKeyboardButton(text="⬅️ Orqaga", callback_data="back_main")],
         ]
     )
+
 
 def gift_basic_stars_menu():
     return InlineKeyboardMarkup(
@@ -296,7 +217,6 @@ def gift_basic_stars_menu():
             [InlineKeyboardButton(text="⬅️ Orqaga", callback_data="menu_gift")],
         ]
     )
-
 
 
 def admin_order_buttons(order_id: int):
@@ -320,41 +240,13 @@ def back_to_main_button():
         ]
     )
 
-
 # =========================
 # HELPERS
 # =========================
-PRODUCTS = {
-    "buy_premium_3m_no_login": ("Premium", "Premium 3 oy (Akkountga kirmasdan) — 175 000 so‘m"),
-    "buy_premium_6m_no_login": ("Premium", "Premium 6 oy (Akkountga kirmasdan) — 220 000 so‘m"),
-    "buy_premium_12m_no_login": ("Premium", "Premium 12 oy (Akkountga kirmasdan) — 375 000 so‘m"),
-
-    "buy_premium_1m_login": ("Premium", "Premium 1 oy (Akkountga kirib) — 45 000 so‘m"),
-    "buy_premium_12m_login": ("Premium", "Premium 12 oy (Akkountga kirib) — 280 000 so‘m"),
-
-    "buy_stars_50": ("Stars", "50 Stars — 12 000 so‘m"),
-    "buy_stars_75": ("Stars", "75 Stars — 16 000 so‘m"),
-    "buy_stars_100": ("Stars", "100 Stars — 23 000 so‘m"),
-    "buy_stars_150": ("Stars", "150 Stars — 34 000 so‘m"),
-    "buy_stars_250": ("Stars", "250 Stars — 55 000 so‘m"),
-    "buy_stars_500": ("Stars", "500 Stars — 105 000 so‘m"),
-    "buy_stars_1000": ("Stars", "1000 Stars — 205 000 so‘m"),
-
-    "buy_gift_premium": ("Gift", "Gift Premium"),
-    
-    "buy_stars_15": ("Stars", "15 Stars — 3 500 so‘m"),
-    "buy_stars_25": ("Stars", "25 Stars — 6 000 so‘m"),
-    "buy_stars_50": ("Stars", "50 Stars — 12 000 so‘m"),
-    "buy_stars_100": ("Stars", "100 Stars — 23 000 so‘m"),
-
-   
-}
-
-
 def save_user(telegram_id: int, full_name: str, username: str | None):
     cursor.execute("""
         INSERT OR REPLACE INTO users (telegram_id, full_name, username, created_at)
-        VALUES (?, ?, ?, COALESCE((SELECT created_at FROM users WHERE telegram_id=?), ?))
+        VALUES (?, ?, ?, COALESCE((SELECT created_at FROM users WHERE telegram_id = ?), ?))
     """, (
         telegram_id,
         full_name,
@@ -426,17 +318,11 @@ def update_order_status(order_id: int, status: str):
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     if status == "confirmed":
-        cursor.execute("""
-            UPDATE orders SET status = ?, confirmed_at = ? WHERE id = ?
-        """, (status, now, order_id))
+        cursor.execute("UPDATE orders SET status = ?, confirmed_at = ? WHERE id = ?", (status, now, order_id))
     elif status == "delivered":
-        cursor.execute("""
-            UPDATE orders SET status = ?, delivered_at = ? WHERE id = ?
-        """, (status, now, order_id))
+        cursor.execute("UPDATE orders SET status = ?, delivered_at = ? WHERE id = ?", (status, now, order_id))
     else:
-        cursor.execute("""
-            UPDATE orders SET status = ? WHERE id = ?
-        """, (status, order_id))
+        cursor.execute("UPDATE orders SET status = ? WHERE id = ?", (status, order_id))
 
     conn.commit()
 
@@ -460,11 +346,11 @@ def get_welcome_text(full_name: str) -> str:
         f"Bu bot orqali siz:\n"
         f"• ⭐ Premium xarid qilasiz\n"
         f"• 🎁 Gift yuborasiz\n"
+        f"• ✨ Stars xarid qilasiz\n"
         f"• 📦 Buyurtmalarni kuzatasiz\n"
         f"• 🆘 Yordam olasiz\n\n"
         f"Pastdagi menyudan kerakli bo‘limni tanlang."
     )
-
 
 # =========================
 # START
@@ -489,14 +375,13 @@ async def start_handler(message: Message, state: FSMContext):
         reply_markup=main_menu_inline()
     )
 
-
 # =========================
-# REPLY KEYBOARD HANDLERS
+# REPLY KEYBOARD
 # =========================
 @dp.message(F.text == "⭐ Premium")
 async def reply_premium_handler(message: Message):
     await message.answer(
-        "⭐ <b>Premium bo‘limi</b>\n\nPaketni tanlang:",
+        "⭐ <b>Premium bo‘limi</b>\n\nVariantni tanlang:",
         reply_markup=premium_menu()
     )
 
@@ -508,13 +393,14 @@ async def reply_gift_handler(message: Message):
         reply_markup=gift_menu()
     )
 
-@dp.callback_query(F.data == "gift_basic_menu")
-async def gift_basic_menu_handler(callback: CallbackQuery):
-    await callback.message.edit_text(
-        "⭐ <b>Gift Basic Stars</b>\n\nKerakli stars paketini tanlang:",
-        reply_markup=gift_basic_stars_menu()
+
+@dp.message(F.text == "✨ Stars")
+async def reply_stars_handler(message: Message):
+    await message.answer(
+        "✨ <b>Stars bo‘limi</b>\n\nKerakli stars paketini tanlang:",
+        reply_markup=stars_menu()
     )
-    await callback.answer()
+
 
 @dp.message(F.text == "📦 Buyurtmalarim")
 async def reply_my_orders_handler(message: Message):
@@ -545,7 +431,7 @@ async def reply_rules_handler(message: Message):
         "2. Username noto‘g‘ri kiritilsa, javobgarlik foydalanuvchida bo‘ladi.\n"
         "3. Soxta chek yuborish taqiqlanadi.\n"
         "4. Yetkazib berish admin tomonidan amalga oshiriladi.\n"
-        "5. Chek rasm yoki matn ko‘rinishida yuborilishi mumkin."
+        "5. Chek rasm, screenshot, fayl yoki matn bo‘lishi mumkin."
     )
     await message.answer(text)
 
@@ -555,7 +441,6 @@ async def reply_help_handler(message: Message):
     await message.answer(
         f"🆘 <b>Yordam</b>\n\nAdmin: {SUPPORT_USERNAME}\nMuammo bo‘lsa yozing."
     )
-
 
 # =========================
 # INLINE MENU
@@ -568,6 +453,8 @@ async def back_main_handler(callback: CallbackQuery, state: FSMContext):
         reply_markup=main_menu_inline()
     )
     await callback.answer()
+
+
 @dp.callback_query(F.data == "menu_premium")
 async def premium_handler(callback: CallbackQuery):
     await callback.message.edit_text(
@@ -603,59 +490,21 @@ async def stars_handler(callback: CallbackQuery):
     )
     await callback.answer()
 
-@dp.message(F.text == "✨ Stars")
-async def reply_stars_handler(message: Message):
-    await message.answer(
-        "✨ <b>Stars bo‘limi</b>\n\nKerakli stars paketini tanlang:",
-        reply_markup=stars_menu()
-    )
-
-@dp.message(OrderState.entering_recipient)
-async def recipient_handler(message: Message, state: FSMContext):
-    recipient = (message.text or "").strip()
-
-    if not recipient.startswith("@") or len(recipient) < 5:
-        await message.answer("❌ Username noto‘g‘ri. Masalan: <code>@username</code>")
-        return
-
-    await state.update_data(recipient_username=recipient)
-    await state.set_state(OrderState.entering_receipt)
-
-    text = (
-        "💳 <b>To‘lov ma’lumotlari</b>\n\n"
-        f"💳 Karta: <code>{CARD_NUMBER}</code>\n"
-        f"👤 Karta egasi: <b>{CARD_HOLDER}</b>\n\n"
-        "⚠️ <b>Eslatma:</b>\n"
-        "Faqat o‘zingiz tanlagan buyurtmangizga to‘g‘ri keladigan to‘lov summasini yozing va to‘lov qiling!\n\n"
-        "To‘lov qilgach, quyidagilardan birini yuboring:\n"
-        "• chek rasmi\n"
-        "• screenshot\n"
-        "• PDF / fayl\n"
-        "• yoki matnli izoh\n\n"
-        "Masalan:\n"
-        "<code>Payme orqali to‘lov qildim. Chek ilova qilindi.</code>"
-    )
-    await message.answer(text)
-@dp.message(F.text == "⭐ Premium")
-async def reply_premium_handler(message: Message):
-    await message.answer(
-        "⭐ <b>Premium bo‘limi</b>\n\nVariantni tanlang:",
-        reply_markup=premium_menu()
-    )
-@dp.callback_query(F.data == "menu_premium")
-async def premium_handler(callback: CallbackQuery):
-    await callback.message.edit_text(
-        "⭐ <b>Premium bo‘limi</b>\n\nPaketni tanlang:",
-        reply_markup=premium_menu()
-    )
-    await callback.answer()
-
 
 @dp.callback_query(F.data == "menu_gift")
 async def gift_handler(callback: CallbackQuery):
     await callback.message.edit_text(
         "🎁 <b>Gift bo‘limi</b>\n\nVariantni tanlang:",
         reply_markup=gift_menu()
+    )
+    await callback.answer()
+
+
+@dp.callback_query(F.data == "gift_basic_menu")
+async def gift_basic_menu_handler(callback: CallbackQuery):
+    await callback.message.edit_text(
+        "⭐ <b>Gift Basic Stars</b>\n\nKerakli stars paketini tanlang:",
+        reply_markup=gift_basic_stars_menu()
     )
     await callback.answer()
 
@@ -668,7 +517,7 @@ async def rules_handler(callback: CallbackQuery):
         "2. Username noto‘g‘ri kiritilsa, javobgarlik foydalanuvchida bo‘ladi.\n"
         "3. Soxta chek yuborish taqiqlanadi.\n"
         "4. Yetkazib berish admin tomonidan qo‘lda amalga oshiriladi.\n"
-        "5. Chek rasm, screenshot yoki matn bo‘lishi mumkin."
+        "5. Chek rasm, screenshot, fayl yoki matn bo‘lishi mumkin."
     )
     await callback.message.edit_text(text, reply_markup=back_to_main_button())
     await callback.answer()
@@ -713,7 +562,6 @@ async def my_orders_handler(callback: CallbackQuery):
     )
     await callback.answer()
 
-
 # =========================
 # ORDER FLOW
 # =========================
@@ -747,13 +595,13 @@ async def recipient_handler(message: Message, state: FSMContext):
         "💳 <b>To‘lov ma’lumotlari</b>\n\n"
         f"💳 Karta: <code>{CARD_NUMBER}</code>\n"
         f"👤 Karta egasi: <b>{CARD_HOLDER}</b>\n\n"
+        "⚠️ <b>Eslatma:</b>\n"
+        "Faqat o‘zingiz tanlagan buyurtmangizga mos summani yuboring.\n\n"
         "To‘lov qilgach, quyidagilardan birini yuboring:\n"
         "• chek rasmi\n"
         "• screenshot\n"
         "• PDF / fayl\n"
-        "• yoki matnli izoh\n\n"
-        "Masalan:\n"
-        "<code>Payme orqali 50 000 so‘m to‘ladim. Chek raqami: 12345</code>"
+        "• yoki matnli izoh"
     )
     await message.answer(text)
 
@@ -763,8 +611,7 @@ async def receipt_photo_handler(message: Message, state: FSMContext):
     data = await state.get_data()
 
     caption_text = message.caption.strip() if message.caption else ""
-    photo = message.photo[-1]
-    file_id = photo.file_id
+    file_id = message.photo[-1].file_id
 
     order_id = create_order(
         user_id=message.from_user.id,
@@ -777,31 +624,29 @@ async def receipt_photo_handler(message: Message, state: FSMContext):
         receipt_file_type="photo"
     )
 
-    user_text = (
+    await message.answer(
         f"✅ <b>Buyurtmangiz qabul qilindi</b>\n\n"
         f"🆔 Buyurtma ID: <code>#{order_id}</code>\n"
         f"📦 Mahsulot: <b>{data['product_name']}</b>\n"
         f"🎯 Qabul qiluvchi: {data['recipient_username']}\n"
         f"📌 Status: ⏳ Kutilmoqda\n\n"
-        "Admin chekni tekshiradi."
-    )
-    await message.answer(user_text, reply_markup=main_menu_inline())
-
-    admin_caption = (
-        "📥 <b>Yangi buyurtma (chek rasmi)</b>\n\n"
-        f"🆔 Buyurtma: <code>#{order_id}</code>\n"
-        f"👤 Mijoz: {message.from_user.full_name}\n"
-        f"🪪 User ID: <code>{message.from_user.id}</code>\n"
-        f"📦 Mahsulot: <b>{data['product_name']}</b>\n"
-        f"🎯 Qabul qiluvchi: {data['recipient_username']}\n"
-        f"📝 Izoh: {caption_text if caption_text else 'Yo‘q'}\n"
-        f"📅 Sana: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+        "Admin chekni tekshiradi.",
+        reply_markup=main_menu_inline()
     )
 
     await bot.send_photo(
         chat_id=ADMIN_ID,
         photo=file_id,
-        caption=admin_caption,
+        caption=(
+            "📥 <b>Yangi buyurtma (chek rasmi)</b>\n\n"
+            f"🆔 Buyurtma: <code>#{order_id}</code>\n"
+            f"👤 Mijoz: {message.from_user.full_name}\n"
+            f"🪪 User ID: <code>{message.from_user.id}</code>\n"
+            f"📦 Mahsulot: <b>{data['product_name']}</b>\n"
+            f"🎯 Qabul qiluvchi: {data['recipient_username']}\n"
+            f"📝 Izoh: {caption_text if caption_text else 'Yo‘q'}\n"
+            f"📅 Sana: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+        ),
         reply_markup=admin_order_buttons(order_id)
     )
 
@@ -826,31 +671,29 @@ async def receipt_document_handler(message: Message, state: FSMContext):
         receipt_file_type="document"
     )
 
-    user_text = (
+    await message.answer(
         f"✅ <b>Buyurtmangiz qabul qilindi</b>\n\n"
         f"🆔 Buyurtma ID: <code>#{order_id}</code>\n"
         f"📦 Mahsulot: <b>{data['product_name']}</b>\n"
         f"🎯 Qabul qiluvchi: {data['recipient_username']}\n"
         f"📌 Status: ⏳ Kutilmoqda\n\n"
-        "Admin chekni tekshiradi."
-    )
-    await message.answer(user_text, reply_markup=main_menu_inline())
-
-    admin_caption = (
-        "📥 <b>Yangi buyurtma (fayl/PDF)</b>\n\n"
-        f"🆔 Buyurtma: <code>#{order_id}</code>\n"
-        f"👤 Mijoz: {message.from_user.full_name}\n"
-        f"🪪 User ID: <code>{message.from_user.id}</code>\n"
-        f"📦 Mahsulot: <b>{data['product_name']}</b>\n"
-        f"🎯 Qabul qiluvchi: {data['recipient_username']}\n"
-        f"📝 Izoh: {caption_text if caption_text else 'Yo‘q'}\n"
-        f"📅 Sana: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+        "Admin chekni tekshiradi.",
+        reply_markup=main_menu_inline()
     )
 
     await bot.send_document(
         chat_id=ADMIN_ID,
         document=file_id,
-        caption=admin_caption,
+        caption=(
+            "📥 <b>Yangi buyurtma (fayl/PDF)</b>\n\n"
+            f"🆔 Buyurtma: <code>#{order_id}</code>\n"
+            f"👤 Mijoz: {message.from_user.full_name}\n"
+            f"🪪 User ID: <code>{message.from_user.id}</code>\n"
+            f"📦 Mahsulot: <b>{data['product_name']}</b>\n"
+            f"🎯 Qabul qiluvchi: {data['recipient_username']}\n"
+            f"📝 Izoh: {caption_text if caption_text else 'Yo‘q'}\n"
+            f"📅 Sana: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+        ),
         reply_markup=admin_order_buttons(order_id)
     )
 
@@ -862,6 +705,7 @@ async def receipt_text_handler(message: Message, state: FSMContext):
     data = await state.get_data()
 
     receipt_text = message.text.strip()
+
     order_id = create_order(
         user_id=message.from_user.id,
         customer_name=message.from_user.full_name,
@@ -873,38 +717,35 @@ async def receipt_text_handler(message: Message, state: FSMContext):
         receipt_file_type="text"
     )
 
-    user_text = (
+    await message.answer(
         f"✅ <b>Buyurtmangiz qabul qilindi</b>\n\n"
         f"🆔 Buyurtma ID: <code>#{order_id}</code>\n"
         f"📦 Mahsulot: <b>{data['product_name']}</b>\n"
         f"🎯 Qabul qiluvchi: {data['recipient_username']}\n"
         f"📌 Status: ⏳ Kutilmoqda\n\n"
-        "Admin to‘lovni tekshiradi."
-    )
-    await message.answer(user_text, reply_markup=main_menu_inline())
-
-    admin_text = (
-        "📥 <b>Yangi buyurtma</b>\n\n"
-        f"🆔 Buyurtma: <code>#{order_id}</code>\n"
-        f"👤 Mijoz: {message.from_user.full_name}\n"
-        f"🪪 User ID: <code>{message.from_user.id}</code>\n"
-        f"📦 Mahsulot: <b>{data['product_name']}</b>\n"
-        f"🎯 Qabul qiluvchi: {data['recipient_username']}\n"
-        f"🧾 Chek: {receipt_text}\n"
-        f"📅 Sana: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+        "Admin to‘lovni tekshiradi.",
+        reply_markup=main_menu_inline()
     )
 
     await bot.send_message(
         ADMIN_ID,
-        admin_text,
+        (
+            "📥 <b>Yangi buyurtma</b>\n\n"
+            f"🆔 Buyurtma: <code>#{order_id}</code>\n"
+            f"👤 Mijoz: {message.from_user.full_name}\n"
+            f"🪪 User ID: <code>{message.from_user.id}</code>\n"
+            f"📦 Mahsulot: <b>{data['product_name']}</b>\n"
+            f"🎯 Qabul qiluvchi: {data['recipient_username']}\n"
+            f"🧾 Chek: {receipt_text}\n"
+            f"📅 Sana: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+        ),
         reply_markup=admin_order_buttons(order_id)
     )
 
     await state.clear()
 
-
 # =========================
-# ADMIN ACTIONS
+# ADMIN
 # =========================
 @dp.callback_query(F.data.startswith("admin_"))
 async def admin_actions(callback: CallbackQuery):
@@ -958,9 +799,6 @@ async def admin_actions(callback: CallbackQuery):
     await callback.answer("Bajarildi")
 
 
-# =========================
-# ADMIN COMMAND
-# =========================
 @dp.message(Command("admin"))
 async def admin_panel(message: Message):
     if message.from_user.id != ADMIN_ID:
@@ -979,15 +817,13 @@ async def admin_panel(message: Message):
     cursor.execute("SELECT COUNT(*) FROM users")
     total_users = cursor.fetchone()[0]
 
-    text = (
+    await message.answer(
         "👑 <b>ADMIN PANEL</b>\n\n"
         f"👥 Foydalanuvchilar: <b>{total_users}</b>\n"
         f"⏳ Kutilayotgan buyurtmalar: <b>{pending}</b>\n"
         f"✅ Tasdiqlanganlar: <b>{confirmed}</b>\n"
         f"🎁 Yetkazilganlar: <b>{delivered}</b>"
     )
-    await message.answer(text)
-
 
 # =========================
 # FALLBACK
@@ -999,12 +835,11 @@ async def fallback_handler(message: Message):
         reply_markup=start_menu_keyboard()
     )
 
-
 # =========================
 # MAIN
 # =========================
 async def main():
-    print("Bot ishga tushdi 🚀")
+    logger.info("Bot ishga tushdi")
     await dp.start_polling(bot)
 
 
